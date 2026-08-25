@@ -1,56 +1,32 @@
-package com.justaranize.expense
+name: Build Expense
 
-import android.app.Activity
-import android.os.Bundle
-import android.graphics.Color
-import android.view.Gravity
-import android.widget.*
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-class MainActivity : Activity() {
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 32, 24, 24)
-            setBackgroundColor(Color.rgb(245, 240, 230))
-        }
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
 
-        val title = TextView(this).apply {
-            text = "Expense"
-            textSize = 30f
-            setTextColor(Color.rgb(55, 48, 40))
-        }
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-        val category = Spinner(this).apply {
-            adapter = ArrayAdapter(
-                this@MainActivity,
-                android.R.layout.simple_spinner_dropdown_item,
-                arrayOf(
-                    "Food",
-                    "Transport",
-                    "Shopping",
-                    "Bills",
-                    "Other"
-                )
-            )
-        }
-
-        val amount = EditText(this).apply {
-            hint = "Amount"
-            inputType = 2
-        }
-
-        val save = Button(this).apply {
-            text = "Save Expense"
-        }
-
-        root.addView(title)
-        root.addView(category)
-        root.addView(amount)
-        root.addView(save)
-
-        setContentView(root)
-    }
-}
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Expense-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
