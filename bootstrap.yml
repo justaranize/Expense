@@ -1,0 +1,167 @@
+name: Bootstrap Expense
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.5.0
+
+      - name: Create Android project
+        run: |
+          mkdir -p app/src/main/java/com/justaranize/expense
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "Expense"
+          include(":app")
+          EOF
+
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "9.3.0" apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
+
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+          }
+
+          android {
+              namespace = "com.justaranize.expense"
+              compileSdk = 37
+
+              defaultConfig {
+                  applicationId = "com.justaranize.expense"
+                  minSdk = 23
+                  targetSdk = 37
+                  versionCode = 1
+                  versionName = "0.1.0"
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="Expense"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#6B705C</item>
+                  <item name="android:navigationBarColor">#F5F0E6</item>
+                  <item name="android:statusBarColor">#F5F0E6</item>
+                  <item name="android:windowLightStatusBar">true</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/java/com/justaranize/expense/MainActivity.kt <<'EOF'
+          package com.justaranize.expense
+
+          import android.app.Activity
+          import android.os.Bundle
+          import android.graphics.Color
+          import android.view.Gravity
+          import android.widget.LinearLayout
+          import android.widget.TextView
+
+          class MainActivity : Activity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+
+                  val root = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      gravity = Gravity.CENTER
+                      setBackgroundColor(Color.rgb(245, 240, 230))
+                      setPadding(32, 32, 32, 32)
+                  }
+
+                  val title = TextView(this).apply {
+                      text = "Expense"
+                      textSize = 32f
+                      setTextColor(Color.rgb(55, 48, 40))
+                      gravity = Gravity.CENTER
+                  }
+
+                  val subtitle = TextView(this).apply {
+                      text = "Your old-school expense organizer"
+                      textSize = 16f
+                      setTextColor(Color.rgb(90, 82, 70))
+                      gravity = Gravity.CENTER
+                  }
+
+                  root.addView(title)
+                  root.addView(subtitle)
+
+                  setContentView(root)
+              }
+          }
+          EOF
+
+          gradle wrapper --gradle-version 9.5.0
+
+      - name: Commit project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+          git commit -m "Initialize Android project" || exit 0
+          git push
