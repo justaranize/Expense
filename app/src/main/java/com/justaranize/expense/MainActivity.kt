@@ -7,6 +7,10 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import org.json.JSONArray
+import org.json.JSONObject
+import java.text.NumberFormat
+import java.util.Locale
 
 class MainActivity : Activity() {
 
@@ -20,7 +24,6 @@ class MainActivity : Activity() {
     }
 
     private fun showExpense() {
-
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 32, 24, 24)
@@ -45,9 +48,7 @@ class MainActivity : Activity() {
 
         val menu = Button(this).apply {
             text = "☰"
-            setOnClickListener {
-                showMenu()
-            }
+            setOnClickListener { showMenu() }
         }
 
         header.addView(title)
@@ -65,8 +66,16 @@ class MainActivity : Activity() {
                     "Other"
                 )
             )
+        }
 
-            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+        otherNote = EditText(this).apply {
+            hint = "Keterangan"
+            visibility = View.GONE
+        }
+
+        category.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
 
                 override fun onItemSelected(
@@ -79,12 +88,6 @@ class MainActivity : Activity() {
                         if (position == 4) View.VISIBLE else View.GONE
                 }
             }
-        }
-
-        otherNote = EditText(this).apply {
-            hint = "Keterangan"
-            visibility = View.GONE
-        }
 
         amount = EditText(this).apply {
             hint = "Rp 0"
@@ -97,32 +100,7 @@ class MainActivity : Activity() {
             text = "SAVE EXPENSE"
 
             setOnClickListener {
-
-                val value = amount.text.toString().trim()
-
-                if (value.isEmpty() || value.toLongOrNull() == null ||
-                    value.toLong() <= 0
-                ) {
-                    amount.error = "Masukkan nominal"
-                    return@setOnClickListener
-                }
-
-                if (category.selectedItemPosition == 4 &&
-                    otherNote.text.toString().trim().isEmpty()
-                ) {
-                    otherNote.error = "Keterangan wajib diisi"
-                    return@setOnClickListener
-                }
-
-                saveExpense(
-                    category.selectedItem.toString(),
-                    value.toLong(),
-                    otherNote.text.toString().trim()
-                )
-
-                amount.text.clear()
-                otherNote.text.clear()
-                category.setSelection(0)
+                saveCurrentExpense()
             }
         }
 
@@ -142,18 +120,53 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    private fun saveExpense(
-        category: String,
-        amount: Long,
-        note: String
-    ) {
+    private fun saveCurrentExpense() {
+
+        val value = amount.text.toString().trim()
+
+        if (value.isEmpty() || value.toLongOrNull() == null ||
+            value.toLong() <= 0
+        ) {
+            amount.error = "Masukkan nominal"
+            return
+        }
+
+        val position = category.selectedItemPosition
+
+        if (position == 4 &&
+            otherNote.text.toString().trim().isEmpty()
+        ) {
+            otherNote.error = "Keterangan wajib diisi"
+            return
+        }
+
+        val categoryName = category.selectedItem.toString()
+        val note = otherNote.text.toString().trim()
+
         val prefs = getSharedPreferences("expense", MODE_PRIVATE)
 
-        val oldTotal = prefs.getLong("total", 0L)
+        val expenses = JSONArray(
+            prefs.getString("expenses", "[]")
+        )
+
+        val expense = JSONObject().apply {
+            put("category", categoryName)
+            put("amount", value.toLong())
+            put("note", note)
+            put("timestamp", System.currentTimeMillis())
+        }
+
+        expenses.put(expense)
 
         prefs.edit()
-            .putLong("total", oldTotal + amount)
+            .putString("expenses", expenses.toString())
             .apply()
+
+        // Setelah save: tetap di halaman Expense,
+        // semua field kembali kosong.
+        amount.text.clear()
+        otherNote.text.clear()
+        category.setSelection(0)
     }
 
     private fun showMenu() {
@@ -168,7 +181,6 @@ class MainActivity : Activity() {
 
         AlertDialog.Builder(this)
             .setItems(items) { _, which ->
-
                 when (which) {
                     0 -> showHistory()
                     1 -> showReminder()
@@ -183,23 +195,40 @@ class MainActivity : Activity() {
     private fun showHistory() {
 
         val prefs = getSharedPreferences("expense", MODE_PRIVATE)
-        val total = prefs.getLong("total", 0L)
 
-        val message = """
-            Daily / Weekly / Monthly / Yearly
-            
-            Total Expense
-            
-            Rp $total
-            
-            [ CHART ]
-            
-            [ DETAILED EXPENSE ]
-        """.trimIndent()
+        val expenses = JSONArray(
+            prefs.getString("expenses", "[]")
+        )
+
+        var total = 0L
+
+        for (i in 0 until expenses.length()) {
+            total += expenses
+                .getJSONObject(i)
+                .getLong("amount")
+        }
+
+        val formatter = NumberFormat.getNumberInstance(
+            Locale("id", "ID")
+        )
+
+        val totalText = "Rp ${formatter.format(total)}"
 
         AlertDialog.Builder(this)
             .setTitle("History")
-            .setMessage(message)
+            .setMessage(
+                """
+                [ Daily ▼ ]
+                
+                Total Expense
+                
+                $totalText
+                
+                [ CHART ]
+                
+                [ DETAILED EXPENSE ]
+                """.trimIndent()
+            )
             .setPositiveButton("OK", null)
             .show()
     }
@@ -214,7 +243,7 @@ class MainActivity : Activity() {
             .setTitle("Reminder")
             .setView(input)
             .setPositiveButton("SET REMINDER") { _, _ ->
-                // Reminder implementation
+                // Reminder akan kita kerjakan di tahap berikutnya.
             }
             .setNegativeButton("CANCEL", null)
             .show()
@@ -242,6 +271,7 @@ class MainActivity : Activity() {
             And app made with the spirit of lazyness 🤣
             
             Donate
+            
             Buy Me a Coffee
         """.trimIndent()
 
@@ -253,12 +283,6 @@ class MainActivity : Activity() {
     }
 
     override fun onBackPressed() {
-
-        if (currentFocus != null) {
-            currentFocus?.clearFocus()
-            return
-        }
-
         showExpense()
     }
 }
