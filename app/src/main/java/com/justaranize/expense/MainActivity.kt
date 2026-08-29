@@ -6,10 +6,12 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
-import android.text.*
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,6 +29,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        createNotificationChannel()
         showExpense()
 
         if (
@@ -36,18 +40,14 @@ class MainActivity : Activity() {
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(
-                arrayOf(
-                    Manifest.permission.POST_NOTIFICATIONS
-                ),
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
                 100
             )
         }
-
-        createNotificationChannel()
     }
 
     // =========================
-    // EXPENSE INPUT
+    // EXPENSE
     // =========================
 
     private fun showExpense() {
@@ -64,7 +64,7 @@ class MainActivity : Activity() {
         }
 
         val title = TextView(this).apply {
-            text = "Expense"
+            text = "Pengeluaran"
             textSize = 30f
             setTextColor(Color.BLACK)
 
@@ -78,6 +78,7 @@ class MainActivity : Activity() {
         val menu = Button(this).apply {
             text = "☰"
             setOnClickListener {
+                hideKeyboard()
                 showMenu()
             }
         }
@@ -91,17 +92,18 @@ class MainActivity : Activity() {
             this,
             android.R.layout.simple_spinner_dropdown_item,
             arrayOf(
-                "Food",
-                "Transport",
-                "Shopping",
-                "Bills",
-                "Other"
+                "Makanan",
+                "Transportasi",
+                "Belanja",
+                "Tagihan",
+                "Lainnya"
             )
         )
 
         otherNote = EditText(this).apply {
             hint = "Keterangan"
             visibility = View.GONE
+            setSingleLine(true)
         }
 
         category.onItemSelectedListener =
@@ -127,12 +129,14 @@ class MainActivity : Activity() {
             }
 
         amount = EditText(this).apply {
-            hint = "${currencyPrefix()} 0"
-            inputType =
-                InputType.TYPE_CLASS_NUMBER
+            hint = "Rp 0"
+            inputType = InputType.TYPE_CLASS_NUMBER
             gravity = Gravity.CENTER
             textSize = 28f
             setSingleLine(true)
+
+            // Tidak ada garis bawaan EditText
+            background = null
         }
 
         amount.addTextChangedListener(
@@ -163,13 +167,10 @@ class MainActivity : Activity() {
                         ?.replace(".", "")
                         ?.replace(",", "")
                         ?.replace("Rp", "")
-                        ?.replace("$", "")
                         ?.replace(" ", "")
                         ?.trim()
 
-                    if (raw.isNullOrEmpty()) {
-                        return
-                    }
+                    if (raw.isNullOrEmpty()) return
 
                     val number =
                         raw.toLongOrNull()
@@ -178,7 +179,7 @@ class MainActivity : Activity() {
                     formattingAmount = true
 
                     amount.setText(
-                        formatInputCurrency(number)
+                        formatInput(number)
                     )
 
                     amount.setSelection(
@@ -191,10 +192,10 @@ class MainActivity : Activity() {
         )
 
         val save = Button(this).apply {
-            text = "SAVE EXPENSE"
+            text = "SIMPAN PENGELUARAN"
 
             setOnClickListener {
-                saveCurrentExpense()
+                saveExpense()
             }
         }
 
@@ -202,94 +203,59 @@ class MainActivity : Activity() {
         root.addView(category)
         root.addView(otherNote)
         root.addView(amount)
-        root.addView(save)
+
+        root.addView(
+            save,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         setContentView(root)
     }
 
     // =========================
-    // CURRENCY
+    // INPUT
     // =========================
 
-    private fun getCurrency(): String {
-
-        return getSharedPreferences(
-            "expense",
-            MODE_PRIVATE
-        ).getString(
-            "currency",
-            "IDR"
-        ) ?: "IDR"
-    }
-
-    private fun currencyPrefix(): String {
-
-        return if (getCurrency() == "USD") {
-            "$"
-        } else {
-            "Rp"
-        }
-    }
-
-    private fun formatInputCurrency(
-        value: Long
-    ): String {
+    private fun formatInput(value: Long): String {
 
         val formatted =
-            if (getCurrency() == "USD") {
-
-                NumberFormat
-                    .getNumberInstance(Locale.US)
-                    .format(value)
-
-            } else {
-
-                NumberFormat
-                    .getNumberInstance(
-                        Locale("id", "ID")
-                    )
-                    .format(value)
-            }
-
-        return "${currencyPrefix()} $formatted"
-    }
-
-    private fun formatCurrency(
-        value: Long
-    ): String {
-
-        return if (getCurrency() == "USD") {
-
-            NumberFormat
-                .getNumberInstance(Locale.US)
-                .format(value)
-
-        } else {
-
             NumberFormat
                 .getNumberInstance(
                     Locale("id", "ID")
                 )
                 .format(value)
-        }
+
+        return "Rp $formatted"
     }
 
-    // =========================
-    // SAVE EXPENSE
-    // =========================
+    private fun formatCurrency(value: Long): String {
 
-    private fun saveCurrentExpense() {
+        return NumberFormat
+            .getNumberInstance(
+                Locale("id", "ID")
+            )
+            .format(value)
+    }
+
+    private fun getRawAmount(): Long? {
 
         val raw = amount.text
             .toString()
             .replace(".", "")
             .replace(",", "")
             .replace("Rp", "")
-            .replace("$", "")
             .replace(" ", "")
             .trim()
 
-        val value = raw.toLongOrNull()
+        return raw.toLongOrNull()
+    }
+
+    private fun saveExpense() {
+
+        val value = getRawAmount()
 
         if (value == null || value <= 0) {
             amount.error = "Masukkan nominal"
@@ -299,13 +265,12 @@ class MainActivity : Activity() {
         val position =
             category.selectedItemPosition
 
-        if (
-            position == 4 &&
+        val note =
             otherNote.text
                 .toString()
                 .trim()
-                .isEmpty()
-        ) {
+
+        if (position == 4 && note.isEmpty()) {
             otherNote.error =
                 "Keterangan wajib diisi"
             return
@@ -326,14 +291,12 @@ class MainActivity : Activity() {
 
                 put(
                     "currency",
-                    getCurrency()
+                    "IDR"
                 )
 
                 put(
                     "note",
-                    otherNote.text
-                        .toString()
-                        .trim()
+                    note
                 )
 
                 put(
@@ -365,9 +328,12 @@ class MainActivity : Activity() {
             )
             .apply()
 
+        // Setelah selesai input kembali kosong
         amount.text.clear()
         otherNote.text.clear()
         category.setSelection(0)
+
+        hideKeyboard()
     }
 
     // =========================
@@ -377,23 +343,25 @@ class MainActivity : Activity() {
     private fun showMenu() {
 
         val items = arrayOf(
-            "History",
-            "Reminder",
-            "Setting",
-            "About",
-            "Exit"
+            "Riwayat",
+            "Pengingat",
+            "Tentang",
+            "Keluar"
         )
 
         AlertDialog.Builder(this)
+            .setTitle("Menu")
             .setItems(items) { _, which ->
 
                 when (which) {
 
                     0 -> showHistory()
+
                     1 -> showReminder()
-                    2 -> showSettings()
-                    3 -> showAbout()
-                    4 -> finish()
+
+                    2 -> showAbout()
+
+                    3 -> finish()
                 }
             }
             .show()
@@ -425,7 +393,8 @@ class MainActivity : Activity() {
 
         val title =
             TextView(this).apply {
-                text = "History"
+
+                text = "Riwayat"
                 textSize = 30f
                 setTextColor(Color.BLACK)
             }
@@ -439,25 +408,28 @@ class MainActivity : Activity() {
                 android.R.layout
                     .simple_spinner_dropdown_item,
                 arrayOf(
-                    "Daily",
-                    "Weekly",
-                    "Monthly",
-                    "Yearly"
+                    "Harian",
+                    "Mingguan",
+                    "Bulanan",
+                    "Tahunan"
                 )
             )
 
         val totalLabel =
             TextView(this).apply {
-                text = "Total Expense"
+
+                text = "Total Pengeluaran"
                 textSize = 16f
                 setTextColor(Color.BLACK)
             }
 
         val total =
             TextView(this).apply {
+
                 textSize = 28f
                 gravity = Gravity.CENTER
                 setTextColor(Color.BLACK)
+
                 setPadding(
                     0,
                     16,
@@ -468,9 +440,11 @@ class MainActivity : Activity() {
 
         val chart =
             TextView(this).apply {
+
                 textSize = 16f
                 gravity = Gravity.CENTER
                 setTextColor(Color.BLACK)
+
                 setPadding(
                     0,
                     24,
@@ -482,8 +456,7 @@ class MainActivity : Activity() {
         val detailed =
             Button(this).apply {
 
-                text =
-                    "DETAILED EXPENSE"
+                text = "RINCIAN PENGELUARAN"
 
                 setOnClickListener {
 
@@ -514,37 +487,30 @@ class MainActivity : Activity() {
             }
 
             total.text =
-                "${currencyPrefix()} ${
-                    formatCurrency(sum)
-                }"
+                "Rp ${formatCurrency(sum)}"
 
             chart.text =
                 if (filtered.isEmpty()) {
                     "Chart kosong"
                 } else {
-                    buildSimpleChart(filtered)
+                    buildChart(filtered)
                 }
         }
 
         period.onItemSelectedListener =
             object :
-                AdapterView
-                    .OnItemSelectedListener {
+                AdapterView.OnItemSelectedListener {
 
-                override fun
-                    onNothingSelected(
-                        parent:
-                        AdapterView<*>?
-                    ) {}
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ) {}
 
-                override fun
-                    onItemSelected(
-                        parent:
-                        AdapterView<*>?,
-                        view: View?,
-                        position: Int,
-                        id: Long
-                    ) {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
                     refresh()
                 }
             }
@@ -581,9 +547,7 @@ class MainActivity : Activity() {
         val result =
             mutableListOf<JSONObject>()
 
-        for (i in
-            0 until array.length()) {
-
+        for (i in 0 until array.length()) {
             result.add(
                 array.getJSONObject(i)
             )
@@ -633,7 +597,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun buildSimpleChart(
+    private fun buildChart(
         expenses: List<JSONObject>
     ): String {
 
@@ -652,28 +616,18 @@ class MainActivity : Activity() {
                 (categories[name] ?: 0L) + value
         }
 
-        val result =
-            StringBuilder()
+        return categories.entries
+            .joinToString("\n\n") {
 
-        for ((name, value) in categories) {
-
-            result
-                .append(name)
-                .append("\n")
-
-            result
-                .append(currencyPrefix())
-                .append(" ")
-                .append(
-                    formatCurrency(value)
-                )
-                .append("\n\n")
-        }
-
-        return result
-            .toString()
-            .trim()
+                "${it.key}\nRp ${
+                    formatCurrency(it.value)
+                }"
+            }
     }
+
+    // =========================
+    // DETAILED
+    // =========================
 
     private fun showDetailedExpense(
         period: Int
@@ -704,7 +658,6 @@ class MainActivity : Activity() {
         }
 
         val message =
-
             if (categories.isEmpty()) {
 
                 "Belum ada pengeluaran."
@@ -714,9 +667,7 @@ class MainActivity : Activity() {
                 categories.entries
                     .joinToString("\n\n") {
 
-                        "${it.key}\n${
-                            currencyPrefix()
-                        } ${
+                        "${it.key}\nRp ${
                             formatCurrency(
                                 it.value
                             )
@@ -725,7 +676,9 @@ class MainActivity : Activity() {
             }
 
         AlertDialog.Builder(this)
-            .setTitle("Detailed Expense")
+            .setTitle(
+                "Rincian Pengeluaran"
+            )
             .setMessage(message)
             .setPositiveButton(
                 "OK",
@@ -774,7 +727,8 @@ class MainActivity : Activity() {
 
         val title =
             TextView(this).apply {
-                text = "Reminder"
+
+                text = "Pengingat"
                 textSize = 30f
                 setTextColor(Color.BLACK)
             }
@@ -799,7 +753,7 @@ class MainActivity : Activity() {
         val add =
             Button(this).apply {
 
-                text = "ADD REMINDER"
+                text = "TAMBAH PENGINGAT"
 
                 setOnClickListener {
                     editReminder(-1)
@@ -807,6 +761,7 @@ class MainActivity : Activity() {
             }
 
         root.addView(title)
+
         root.addView(
             list,
             LinearLayout.LayoutParams(
@@ -815,6 +770,7 @@ class MainActivity : Activity() {
                 1f
             )
         )
+
         root.addView(add)
 
         setContentView(root)
@@ -840,9 +796,7 @@ class MainActivity : Activity() {
         val result =
             mutableListOf<JSONObject>()
 
-        for (i in
-            0 until array.length()) {
-
+        for (i in 0 until array.length()) {
             result.add(
                 array.getJSONObject(i)
             )
@@ -890,13 +844,10 @@ class MainActivity : Activity() {
         val message =
             EditText(this).apply {
 
-                hint =
-                    "Tulis pesan reminder"
+                hint = "Tulis pesan pengingat"
 
                 inputType =
                     InputType.TYPE_CLASS_TEXT
-
-                setSingleLine(false)
 
                 if (existing != null) {
                     setText(
@@ -908,60 +859,61 @@ class MainActivity : Activity() {
             }
 
         val timeButton =
-            Button(this).apply {
-
-                text =
-                    if (existing != null) {
-                        existing.getString("time")
-                    } else {
-                        "Pilih waktu"
-                    }
-            }
+            Button(this)
 
         var selectedHour =
             if (existing != null) {
+
                 existing
                     .getString("time")
                     .substringBefore(":")
                     .toInt()
+
             } else {
                 9
             }
 
         var selectedMinute =
             if (existing != null) {
+
                 existing
                     .getString("time")
                     .substringAfter(":")
                     .toInt()
+
             } else {
                 0
             }
 
+        timeButton.text =
+            String.format(
+                Locale.US,
+                "%02d:%02d",
+                selectedHour,
+                selectedMinute
+            )
+
         timeButton.setOnClickListener {
 
-            val picker =
-                TimePickerDialog(
-                    this,
-                    { _, hour, minute ->
+            TimePickerDialog(
+                this,
+                { _, hour, minute ->
 
-                        selectedHour = hour
-                        selectedMinute = minute
+                    selectedHour = hour
+                    selectedMinute = minute
 
-                        timeButton.text =
-                            String.format(
-                                Locale.US,
-                                "%02d:%02d",
-                                hour,
-                                minute
-                            )
-                    },
-                    selectedHour,
-                    selectedMinute,
-                    true
-                )
-
-            picker.show()
+                    timeButton.text =
+                        String.format(
+                            Locale.US,
+                            "%02d:%02d",
+                            hour,
+                            minute
+                        )
+                },
+                selectedHour,
+                selectedMinute,
+                true
+            ).show()
         }
 
         val container =
@@ -985,16 +937,16 @@ class MainActivity : Activity() {
             AlertDialog.Builder(this)
                 .setTitle(
                     if (index >= 0)
-                        "Edit Reminder"
+                        "Edit Pengingat"
                     else
-                        "Add Reminder"
+                        "Tambah Pengingat"
                 )
                 .setView(container)
 
         if (index >= 0) {
 
             builder.setNeutralButton(
-                "DELETE"
+                "HAPUS"
             ) { _, _ ->
 
                 cancelReminder(
@@ -1011,7 +963,7 @@ class MainActivity : Activity() {
 
         builder
             .setPositiveButton(
-                "SAVE"
+                "SIMPAN"
             ) { _, _ ->
 
                 val text =
@@ -1025,11 +977,15 @@ class MainActivity : Activity() {
 
                 val id =
                     if (existing != null) {
+
                         existing.getInt("id")
+
                     } else {
-                        (System.currentTimeMillis() and
-                            0x7FFFFFFF)
-                            .toInt()
+
+                        (
+                            System.currentTimeMillis()
+                                and 0x7FFFFFFF
+                            ).toInt()
                     }
 
                 val reminder =
@@ -1078,14 +1034,14 @@ class MainActivity : Activity() {
                 showReminder()
             }
             .setNegativeButton(
-                "CANCEL",
+                "BATAL",
                 null
             )
             .show()
     }
 
     // =========================
-    // ALARM
+    // NOTIFICATION
     // =========================
 
     private fun createNotificationChannel() {
@@ -1097,7 +1053,7 @@ class MainActivity : Activity() {
             val channel =
                 NotificationChannel(
                     "expense_reminder",
-                    "Expense Reminder",
+                    "Pengingat Pengeluaran",
                     NotificationManager
                         .IMPORTANCE_DEFAULT
                 )
@@ -1232,116 +1188,95 @@ class MainActivity : Activity() {
     }
 
     // =========================
-    // SETTINGS
-    // =========================
-
-    private fun showSettings() {
-
-        val items = arrayOf(
-            "Currency: ${getCurrency()}",
-            "Language: Indonesia",
-            "Conversion Rate",
-            "Disclaimer"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("Setting")
-            .setItems(items) { _, which ->
-
-                when (which) {
-
-                    0 -> chooseCurrency()
-
-                    1 -> {}
-
-                    2 -> {}
-
-                    3 ->
-                        showDisclaimer()
-                }
-            }
-            .setNegativeButton(
-                "OK",
-                null
-            )
-            .show()
-    }
-
-    private fun chooseCurrency() {
-
-        val currencies =
-            arrayOf(
-                "IDR",
-                "USD"
-            )
-
-        val current =
-            if (
-                getCurrency() == "USD"
-            ) 1 else 0
-
-        AlertDialog.Builder(this)
-            .setTitle("Currency")
-            .setSingleChoiceItems(
-                currencies,
-                current
-            ) { dialog, which ->
-
-                getSharedPreferences(
-                    "expense",
-                    MODE_PRIVATE
-                )
-                    .edit()
-                    .putString(
-                        "currency",
-                        currencies[which]
-                    )
-                    .apply()
-
-                dialog.dismiss()
-                showExpense()
-            }
-            .show()
-    }
-
-    private fun showDisclaimer() {
-
-        AlertDialog.Builder(this)
-            .setTitle("Disclaimer")
-            .setMessage(
-                "Expense is a simple personal " +
-                "expense tracker. Use the data " +
-                "at your own discretion."
-            )
-            .setPositiveButton(
-                "OK",
-                null
-            )
-            .show()
-    }
-
-    // =========================
     // ABOUT
     // =========================
 
     private fun showAbout() {
 
-        val message = """
-            And app made with the spirit of lazyness 🤣
+        val root =
+            LinearLayout(this).apply {
 
-            Donate
+                orientation =
+                    LinearLayout.VERTICAL
 
-            Buy Me a Coffee
-        """.trimIndent()
+                setPadding(
+                    24,
+                    16,
+                    24,
+                    8
+                )
+            }
+
+        val message =
+            TextView(this).apply {
+
+                text =
+                    "And app made with the spirit of lazyness 🤣"
+
+                textSize = 18f
+                setTextColor(Color.BLACK)
+
+                setPadding(
+                    0,
+                    8,
+                    0,
+                    24
+                )
+            }
+
+        val donate =
+            Button(this).apply {
+
+                text = "DONATE"
+
+                setOnClickListener {
+
+                    try {
+
+                        val intent =
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                android.net.Uri.parse(
+                                    "https://www.buymeacoffee.com/"
+                                )
+                            )
+
+                        startActivity(intent)
+
+                    } catch (_: Exception) {}
+                }
+            }
+
+        root.addView(message)
+        root.addView(donate)
 
         AlertDialog.Builder(this)
-            .setTitle("About")
-            .setMessage(message)
+            .setTitle("Tentang")
+            .setView(root)
             .setPositiveButton(
                 "OK",
                 null
             )
             .show()
+    }
+
+    // =========================
+    // KEYBOARD
+    // =========================
+
+    private fun hideKeyboard() {
+
+        val imm =
+            getSystemService(
+                INPUT_METHOD_SERVICE
+            ) as InputMethodManager
+
+        imm.hideSoftInputFromWindow(
+            currentFocus?.windowToken,
+            0
+        )
+
+        currentFocus?.clearFocus()
     }
 
     // =========================
@@ -1349,6 +1284,15 @@ class MainActivity : Activity() {
     // =========================
 
     override fun onBackPressed() {
+
+        if (
+            amount.text
+                .toString()
+                .isNotEmpty()
+        ) {
+            hideKeyboard()
+        }
+
         showExpense()
     }
 }
