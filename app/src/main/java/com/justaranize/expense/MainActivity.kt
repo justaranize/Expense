@@ -1,11 +1,13 @@
 package com.justaranize.expense
 
-import android.app.Activity
-import android.os.Bundle
+import android.Manifest
+import android.app.*
+import android.content.*
+import android.content.pm.PackageManager
 import android.graphics.Color
-import android.text.Editable
+import android.os.Bundle
+import android.text.*
 import android.text.InputType
-import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -26,6 +28,22 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showExpense()
+
+        if (
+            android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.POST_NOTIFICATIONS
+                ),
+                100
+            )
+        }
+
+        createNotificationChannel()
     }
 
     // =========================
@@ -49,6 +67,7 @@ class MainActivity : Activity() {
             text = "Expense"
             textSize = 30f
             setTextColor(Color.BLACK)
+
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -109,7 +128,8 @@ class MainActivity : Activity() {
 
         amount = EditText(this).apply {
             hint = "${currencyPrefix()} 0"
-            inputType = InputType.TYPE_CLASS_NUMBER
+            inputType =
+                InputType.TYPE_CLASS_NUMBER
             gravity = Gravity.CENTER
             textSize = 28f
             setSingleLine(true)
@@ -138,18 +158,16 @@ class MainActivity : Activity() {
 
                     if (formattingAmount) return
 
-                    val text =
-                        s?.toString() ?: ""
+                    val raw = s
+                        ?.toString()
+                        ?.replace(".", "")
+                        ?.replace(",", "")
+                        ?.replace("Rp", "")
+                        ?.replace("$", "")
+                        ?.replace(" ", "")
+                        ?.trim()
 
-                    val raw = text
-                        .replace(".", "")
-                        .replace(",", "")
-                        .replace("Rp", "")
-                        .replace("$", "")
-                        .replace(" ", "")
-                        .trim()
-
-                    if (raw.isEmpty()) {
+                    if (raw.isNullOrEmpty()) {
                         return
                     }
 
@@ -159,10 +177,9 @@ class MainActivity : Activity() {
 
                     formattingAmount = true
 
-                    val formatted =
+                    amount.setText(
                         formatInputCurrency(number)
-
-                    amount.setText(formatted)
+                    )
 
                     amount.setSelection(
                         amount.text.length
@@ -196,13 +213,10 @@ class MainActivity : Activity() {
 
     private fun getCurrency(): String {
 
-        val prefs =
-            getSharedPreferences(
-                "expense",
-                MODE_PRIVATE
-            )
-
-        return prefs.getString(
+        return getSharedPreferences(
+            "expense",
+            MODE_PRIVATE
+        ).getString(
             "currency",
             "IDR"
         ) ?: "IDR"
@@ -261,7 +275,7 @@ class MainActivity : Activity() {
     }
 
     // =========================
-    // SAVE
+    // SAVE EXPENSE
     // =========================
 
     private fun saveCurrentExpense() {
@@ -275,12 +289,10 @@ class MainActivity : Activity() {
             .replace(" ", "")
             .trim()
 
-        val value =
-            raw.toLongOrNull()
+        val value = raw.toLongOrNull()
 
         if (value == null || value <= 0) {
-            amount.error =
-                "Masukkan nominal"
+            amount.error = "Masukkan nominal"
             return
         }
 
@@ -304,8 +316,7 @@ class MainActivity : Activity() {
 
                 put(
                     "category",
-                    category.selectedItem
-                        .toString()
+                    category.selectedItem.toString()
                 )
 
                 put(
@@ -379,13 +390,9 @@ class MainActivity : Activity() {
                 when (which) {
 
                     0 -> showHistory()
-
                     1 -> showReminder()
-
                     2 -> showSettings()
-
                     3 -> showAbout()
-
                     4 -> finish()
                 }
             }
@@ -418,7 +425,6 @@ class MainActivity : Activity() {
 
         val title =
             TextView(this).apply {
-
                 text = "History"
                 textSize = 30f
                 setTextColor(Color.BLACK)
@@ -442,7 +448,6 @@ class MainActivity : Activity() {
 
         val totalLabel =
             TextView(this).apply {
-
                 text = "Total Expense"
                 textSize = 16f
                 setTextColor(Color.BLACK)
@@ -450,11 +455,9 @@ class MainActivity : Activity() {
 
         val total =
             TextView(this).apply {
-
                 textSize = 28f
                 gravity = Gravity.CENTER
                 setTextColor(Color.BLACK)
-
                 setPadding(
                     0,
                     16,
@@ -465,11 +468,9 @@ class MainActivity : Activity() {
 
         val chart =
             TextView(this).apply {
-
                 textSize = 16f
                 gravity = Gravity.CENTER
                 setTextColor(Color.BLACK)
-
                 setPadding(
                     0,
                     24,
@@ -487,8 +488,7 @@ class MainActivity : Activity() {
                 setOnClickListener {
 
                     showDetailedExpense(
-                        period
-                            .selectedItemPosition
+                        period.selectedItemPosition
                     )
                 }
             }
@@ -502,22 +502,15 @@ class MainActivity : Activity() {
                 expenses.filter {
 
                     matchesPeriod(
-                        it.getLong(
-                            "timestamp"
-                        ),
-                        period
-                            .selectedItemPosition
+                        it.getLong("timestamp"),
+                        period.selectedItemPosition
                     )
                 }
 
             var sum = 0L
 
             for (expense in filtered) {
-
-                sum +=
-                    expense.getLong(
-                        "amount"
-                    )
+                sum += expense.getLong("amount")
             }
 
             total.text =
@@ -527,14 +520,9 @@ class MainActivity : Activity() {
 
             chart.text =
                 if (filtered.isEmpty()) {
-
                     "Chart kosong"
-
                 } else {
-
-                    buildSimpleChart(
-                        filtered
-                    )
+                    buildSimpleChart(filtered)
                 }
         }
 
@@ -573,10 +561,6 @@ class MainActivity : Activity() {
         refresh()
     }
 
-    // =========================
-    // GET EXPENSES
-    // =========================
-
     private fun getExpenses():
         List<JSONObject> {
 
@@ -608,10 +592,6 @@ class MainActivity : Activity() {
         return result
     }
 
-    // =========================
-    // PERIOD
-    // =========================
-
     private fun matchesPeriod(
         timestamp: Long,
         period: Int
@@ -622,82 +602,39 @@ class MainActivity : Activity() {
 
         val date =
             Calendar.getInstance().apply {
-
-                timeInMillis =
-                    timestamp
+                timeInMillis = timestamp
             }
 
         return when (period) {
 
             0 ->
-
-                date.get(
-                    Calendar.YEAR
-                ) ==
-                    now.get(
-                        Calendar.YEAR
-                    ) &&
-
-                date.get(
-                    Calendar.DAY_OF_YEAR
-                ) ==
-                    now.get(
-                        Calendar.DAY_OF_YEAR
-                    )
+                date.get(Calendar.YEAR) ==
+                    now.get(Calendar.YEAR) &&
+                date.get(Calendar.DAY_OF_YEAR) ==
+                    now.get(Calendar.DAY_OF_YEAR)
 
             1 ->
-
-                date.get(
-                    Calendar.YEAR
-                ) ==
-                    now.get(
-                        Calendar.YEAR
-                    ) &&
-
-                date.get(
-                    Calendar.WEEK_OF_YEAR
-                ) ==
-                    now.get(
-                        Calendar.WEEK_OF_YEAR
-                    )
+                date.get(Calendar.YEAR) ==
+                    now.get(Calendar.YEAR) &&
+                date.get(Calendar.WEEK_OF_YEAR) ==
+                    now.get(Calendar.WEEK_OF_YEAR)
 
             2 ->
-
-                date.get(
-                    Calendar.YEAR
-                ) ==
-                    now.get(
-                        Calendar.YEAR
-                    ) &&
-
-                date.get(
-                    Calendar.MONTH
-                ) ==
-                    now.get(
-                        Calendar.MONTH
-                    )
+                date.get(Calendar.YEAR) ==
+                    now.get(Calendar.YEAR) &&
+                date.get(Calendar.MONTH) ==
+                    now.get(Calendar.MONTH)
 
             3 ->
+                date.get(Calendar.YEAR) ==
+                    now.get(Calendar.YEAR)
 
-                date.get(
-                    Calendar.YEAR
-                ) ==
-                    now.get(
-                        Calendar.YEAR
-                    )
-
-            else ->
-                false
+            else -> false
         }
     }
 
-    // =========================
-    // CHART
-    // =========================
-
     private fun buildSimpleChart(
-        expenses:
-        List<JSONObject>
+        expenses: List<JSONObject>
     ): String {
 
         val categories =
@@ -706,27 +643,19 @@ class MainActivity : Activity() {
         for (expense in expenses) {
 
             val name =
-                expense.getString(
-                    "category"
-                )
+                expense.getString("category")
 
             val value =
-                expense.getLong(
-                    "amount"
-                )
+                expense.getLong("amount")
 
             categories[name] =
-                (categories[name] ?: 0L) +
-                    value
+                (categories[name] ?: 0L) + value
         }
 
         val result =
             StringBuilder()
 
-        for (
-            (name, value)
-            in categories
-        ) {
+        for ((name, value) in categories) {
 
             result
                 .append(name)
@@ -746,10 +675,6 @@ class MainActivity : Activity() {
             .trim()
     }
 
-    // =========================
-    // DETAILED EXPENSE
-    // =========================
-
     private fun showDetailedExpense(
         period: Int
     ) {
@@ -758,9 +683,7 @@ class MainActivity : Activity() {
             getExpenses().filter {
 
                 matchesPeriod(
-                    it.getLong(
-                        "timestamp"
-                    ),
+                    it.getLong("timestamp"),
                     period
                 )
             }
@@ -771,18 +694,13 @@ class MainActivity : Activity() {
         for (expense in expenses) {
 
             val name =
-                expense.getString(
-                    "category"
-                )
+                expense.getString("category")
 
             val value =
-                expense.getLong(
-                    "amount"
-                )
+                expense.getLong("amount")
 
             categories[name] =
-                (categories[name] ?: 0L) +
-                    value
+                (categories[name] ?: 0L) + value
         }
 
         val message =
@@ -807,9 +725,7 @@ class MainActivity : Activity() {
             }
 
         AlertDialog.Builder(this)
-            .setTitle(
-                "Detailed Expense"
-            )
+            .setTitle("Detailed Expense")
             .setMessage(message)
             .setPositiveButton(
                 "OK",
@@ -824,22 +740,342 @@ class MainActivity : Activity() {
 
     private fun showReminder() {
 
-        val input =
+        val reminders =
+            getReminders()
+
+        val labels =
+            mutableListOf<String>()
+
+        for (reminder in reminders) {
+
+            labels.add(
+                "${reminder.getString("time")}  " +
+                "${reminder.getString("message")}"
+            )
+        }
+
+        val root =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    24,
+                    24,
+                    24,
+                    24
+                )
+
+                setBackgroundColor(
+                    Color.WHITE
+                )
+            }
+
+        val title =
+            TextView(this).apply {
+                text = "Reminder"
+                textSize = 30f
+                setTextColor(Color.BLACK)
+            }
+
+        val list =
+            ListView(this)
+
+        list.adapter =
+            ArrayAdapter(
+                this,
+                android.R.layout
+                    .simple_list_item_1,
+                labels
+            )
+
+        list.setOnItemClickListener {
+                _, _, position, _ ->
+
+            editReminder(position)
+        }
+
+        val add =
+            Button(this).apply {
+
+                text = "ADD REMINDER"
+
+                setOnClickListener {
+                    editReminder(-1)
+                }
+            }
+
+        root.addView(title)
+        root.addView(
+            list,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
+        root.addView(add)
+
+        setContentView(root)
+    }
+
+    private fun getReminders():
+        MutableList<JSONObject> {
+
+        val prefs =
+            getSharedPreferences(
+                "expense",
+                MODE_PRIVATE
+            )
+
+        val array =
+            JSONArray(
+                prefs.getString(
+                    "reminders",
+                    "[]"
+                )
+            )
+
+        val result =
+            mutableListOf<JSONObject>()
+
+        for (i in
+            0 until array.length()) {
+
+            result.add(
+                array.getJSONObject(i)
+            )
+        }
+
+        return result
+    }
+
+    private fun saveReminders(
+        reminders: List<JSONObject>
+    ) {
+
+        val array = JSONArray()
+
+        for (reminder in reminders) {
+            array.put(reminder)
+        }
+
+        getSharedPreferences(
+            "expense",
+            MODE_PRIVATE
+        )
+            .edit()
+            .putString(
+                "reminders",
+                array.toString()
+            )
+            .apply()
+    }
+
+    private fun editReminder(
+        index: Int
+    ) {
+
+        val reminders =
+            getReminders()
+
+        val existing =
+            if (index >= 0) {
+                reminders[index]
+            } else {
+                null
+            }
+
+        val message =
             EditText(this).apply {
 
                 hint =
-                    "Tulis reminder"
+                    "Tulis pesan reminder"
+
+                inputType =
+                    InputType.TYPE_CLASS_TEXT
+
+                setSingleLine(false)
+
+                if (existing != null) {
+                    setText(
+                        existing.getString(
+                            "message"
+                        )
+                    )
+                }
             }
 
-        AlertDialog.Builder(this)
-            .setTitle("Reminder")
-            .setView(input)
-            .setPositiveButton(
-                "SET REMINDER"
+        val timeButton =
+            Button(this).apply {
+
+                text =
+                    if (existing != null) {
+                        existing.getString("time")
+                    } else {
+                        "Pilih waktu"
+                    }
+            }
+
+        var selectedHour =
+            if (existing != null) {
+                existing
+                    .getString("time")
+                    .substringBefore(":")
+                    .toInt()
+            } else {
+                9
+            }
+
+        var selectedMinute =
+            if (existing != null) {
+                existing
+                    .getString("time")
+                    .substringAfter(":")
+                    .toInt()
+            } else {
+                0
+            }
+
+        timeButton.setOnClickListener {
+
+            val picker =
+                TimePickerDialog(
+                    this,
+                    { _, hour, minute ->
+
+                        selectedHour = hour
+                        selectedMinute = minute
+
+                        timeButton.text =
+                            String.format(
+                                Locale.US,
+                                "%02d:%02d",
+                                hour,
+                                minute
+                            )
+                    },
+                    selectedHour,
+                    selectedMinute,
+                    true
+                )
+
+            picker.show()
+        }
+
+        val container =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    24,
+                    8,
+                    24,
+                    8
+                )
+
+                addView(message)
+                addView(timeButton)
+            }
+
+        val builder =
+            AlertDialog.Builder(this)
+                .setTitle(
+                    if (index >= 0)
+                        "Edit Reminder"
+                    else
+                        "Add Reminder"
+                )
+                .setView(container)
+
+        if (index >= 0) {
+
+            builder.setNeutralButton(
+                "DELETE"
             ) { _, _ ->
 
-                // Akan dibuat
-                // di tahap berikutnya.
+                cancelReminder(
+                    reminders[index]
+                )
+
+                reminders.removeAt(index)
+
+                saveReminders(reminders)
+
+                showReminder()
+            }
+        }
+
+        builder
+            .setPositiveButton(
+                "SAVE"
+            ) { _, _ ->
+
+                val text =
+                    message.text
+                        .toString()
+                        .trim()
+
+                if (text.isEmpty()) {
+                    return@setPositiveButton
+                }
+
+                val id =
+                    if (existing != null) {
+                        existing.getInt("id")
+                    } else {
+                        (System.currentTimeMillis() and
+                            0x7FFFFFFF)
+                            .toInt()
+                    }
+
+                val reminder =
+                    JSONObject().apply {
+
+                        put("id", id)
+
+                        put(
+                            "message",
+                            text
+                        )
+
+                        put(
+                            "time",
+                            String.format(
+                                Locale.US,
+                                "%02d:%02d",
+                                selectedHour,
+                                selectedMinute
+                            )
+                        )
+                    }
+
+                if (index >= 0) {
+
+                    cancelReminder(
+                        reminders[index]
+                    )
+
+                    reminders[index] =
+                        reminder
+
+                } else {
+
+                    reminders.add(
+                        reminder
+                    )
+                }
+
+                saveReminders(reminders)
+
+                scheduleReminder(
+                    reminder
+                )
+
+                showReminder()
             }
             .setNegativeButton(
                 "CANCEL",
@@ -849,21 +1085,162 @@ class MainActivity : Activity() {
     }
 
     // =========================
+    // ALARM
+    // =========================
+
+    private fun createNotificationChannel() {
+
+        if (
+            android.os.Build.VERSION.SDK_INT >= 26
+        ) {
+
+            val channel =
+                NotificationChannel(
+                    "expense_reminder",
+                    "Expense Reminder",
+                    NotificationManager
+                        .IMPORTANCE_DEFAULT
+                )
+
+            val manager =
+                getSystemService(
+                    NotificationManager::class.java
+                )
+
+            manager.createNotificationChannel(
+                channel
+            )
+        }
+    }
+
+    private fun scheduleReminder(
+        reminder: JSONObject
+    ) {
+
+        val time =
+            reminder.getString("time")
+
+        val hour =
+            time.substringBefore(":")
+                .toInt()
+
+        val minute =
+            time.substringAfter(":")
+                .toInt()
+
+        val calendar =
+            Calendar.getInstance().apply {
+
+                set(
+                    Calendar.HOUR_OF_DAY,
+                    hour
+                )
+
+                set(
+                    Calendar.MINUTE,
+                    minute
+                )
+
+                set(
+                    Calendar.SECOND,
+                    0
+                )
+
+                set(
+                    Calendar.MILLISECOND,
+                    0
+                )
+
+                if (
+                    before(
+                        Calendar.getInstance()
+                    )
+                ) {
+                    add(
+                        Calendar.DAY_OF_YEAR,
+                        1
+                    )
+                }
+            }
+
+        val intent =
+            Intent(
+                this,
+                ReminderReceiver::class.java
+            ).apply {
+
+                putExtra(
+                    "id",
+                    reminder.getInt("id")
+                )
+
+                putExtra(
+                    "message",
+                    reminder.getString(
+                        "message"
+                    )
+                )
+            }
+
+        val pending =
+            PendingIntent.getBroadcast(
+                this,
+                reminder.getInt("id"),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_IMMUTABLE
+            )
+
+        val alarm =
+            getSystemService(
+                ALARM_SERVICE
+            ) as AlarmManager
+
+        alarm.setRepeating(
+            AlarmManager.RTC_WAKEUP,
+            calendar.timeInMillis,
+            AlarmManager.INTERVAL_DAY,
+            pending
+        )
+    }
+
+    private fun cancelReminder(
+        reminder: JSONObject
+    ) {
+
+        val intent =
+            Intent(
+                this,
+                ReminderReceiver::class.java
+            )
+
+        val pending =
+            PendingIntent.getBroadcast(
+                this,
+                reminder.getInt("id"),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_IMMUTABLE
+            )
+
+        val alarm =
+            getSystemService(
+                ALARM_SERVICE
+            ) as AlarmManager
+
+        alarm.cancel(pending)
+    }
+
+    // =========================
     // SETTINGS
     // =========================
 
     private fun showSettings() {
 
         val items = arrayOf(
-
-            "Currency: ${
-                getCurrency()
-            }",
-
+            "Currency: ${getCurrency()}",
             "Language: Indonesia",
-
             "Conversion Rate",
-
             "Disclaimer"
         )
 
@@ -873,18 +1250,11 @@ class MainActivity : Activity() {
 
                 when (which) {
 
-                    0 ->
-                        chooseCurrency()
+                    0 -> chooseCurrency()
 
-                    1 -> {
-                        // Indonesia
-                        // untuk first launch.
-                    }
+                    1 -> {}
 
-                    2 -> {
-                        // Conversion rate
-                        // akan dibuat nanti.
-                    }
+                    2 -> {}
 
                     3 ->
                         showDisclaimer()
@@ -908,11 +1278,7 @@ class MainActivity : Activity() {
         val current =
             if (
                 getCurrency() == "USD"
-            ) {
-                1
-            } else {
-                0
-            }
+            ) 1 else 0
 
         AlertDialog.Builder(this)
             .setTitle("Currency")
@@ -933,9 +1299,6 @@ class MainActivity : Activity() {
                     .apply()
 
                 dialog.dismiss()
-
-                // Refresh halaman input
-                // agar prefix langsung berubah.
                 showExpense()
             }
             .show()
@@ -986,7 +1349,6 @@ class MainActivity : Activity() {
     // =========================
 
     override fun onBackPressed() {
-
         showExpense()
     }
 }
