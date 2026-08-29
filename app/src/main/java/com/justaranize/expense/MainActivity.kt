@@ -3,7 +3,9 @@ package com.justaranize.expense
 import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -18,6 +20,8 @@ class MainActivity : Activity() {
     private lateinit var category: Spinner
     private lateinit var otherNote: EditText
     private lateinit var amount: EditText
+
+    private var formattingAmount = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,6 +114,57 @@ class MainActivity : Activity() {
             textSize = 28f
         }
 
+        amount.addTextChangedListener(
+            object : TextWatcher {
+
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {}
+
+                override fun afterTextChanged(
+                    s: Editable?
+                ) {
+
+                    if (formattingAmount) return
+
+                    val raw = s
+                        ?.toString()
+                        ?.replace(".", "")
+                        ?.replace(",", "")
+                        ?.replace("Rp", "")
+                        ?.replace("$", "")
+                        ?.trim()
+
+                    if (raw.isNullOrEmpty()) return
+
+                    val number = raw.toLongOrNull()
+                        ?: return
+
+                    formattingAmount = true
+
+                    val formatted =
+                        formatCurrency(number)
+
+                    amount.setText(formatted)
+                    amount.setSelection(
+                        amount.text.length
+                    )
+
+                    formattingAmount = false
+                }
+            }
+        )
+
         val save = Button(this).apply {
             text = "SAVE EXPENSE"
 
@@ -134,30 +189,88 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
+    // =========================
+    // CURRENCY FORMAT
+    // =========================
+
+    private fun getCurrency(): String {
+
+        val prefs = getSharedPreferences(
+            "expense",
+            MODE_PRIVATE
+        )
+
+        return prefs.getString(
+            "currency",
+            "IDR"
+        ) ?: "IDR"
+    }
+
+    private fun formatCurrency(
+        value: Long
+    ): String {
+
+        return if (getCurrency() == "USD") {
+
+            NumberFormat.getNumberInstance(
+                Locale.US
+            ).format(value)
+
+        } else {
+
+            NumberFormat.getNumberInstance(
+                Locale("id", "ID")
+            ).format(value)
+        }
+    }
+
+    private fun currencyPrefix(): String {
+
+        return if (getCurrency() == "USD") {
+            "$"
+        } else {
+            "Rp"
+        }
+    }
+
+    // =========================
+    // SAVE
+    // =========================
+
     private fun saveCurrentExpense() {
 
-        val value = amount.text.toString().trim()
+        val raw = amount.text
+            .toString()
+            .replace(".", "")
+            .replace(",", "")
+            .replace("Rp", "")
+            .replace("$", "")
+            .trim()
 
-        if (
-            value.isEmpty() ||
-            value.toLongOrNull() == null ||
-            value.toLong() <= 0
-        ) {
+        val value = raw.toLongOrNull()
+
+        if (value == null || value <= 0) {
             amount.error = "Masukkan nominal"
             return
         }
 
-        val position = category.selectedItemPosition
+        val position =
+            category.selectedItemPosition
 
         if (
             position == 4 &&
-            otherNote.text.toString().trim().isEmpty()
+            otherNote.text
+                .toString()
+                .trim()
+                .isEmpty()
         ) {
-            otherNote.error = "Keterangan wajib diisi"
+            otherNote.error =
+                "Keterangan wajib diisi"
             return
         }
 
         val expense = JSONObject().apply {
+
             put(
                 "category",
                 category.selectedItem.toString()
@@ -165,12 +278,19 @@ class MainActivity : Activity() {
 
             put(
                 "amount",
-                value.toLong()
+                value
+            )
+
+            put(
+                "currency",
+                getCurrency()
             )
 
             put(
                 "note",
-                otherNote.text.toString().trim()
+                otherNote.text
+                    .toString()
+                    .trim()
             )
 
             put(
@@ -179,13 +299,17 @@ class MainActivity : Activity() {
             )
         }
 
-        val prefs = getSharedPreferences(
-            "expense",
-            MODE_PRIVATE
-        )
+        val prefs =
+            getSharedPreferences(
+                "expense",
+                MODE_PRIVATE
+            )
 
         val expenses = JSONArray(
-            prefs.getString("expenses", "[]")
+            prefs.getString(
+                "expenses",
+                "[]"
+            )
         )
 
         expenses.put(expense)
@@ -197,8 +321,7 @@ class MainActivity : Activity() {
             )
             .apply()
 
-        // Setelah save:
-        // kembali kosong dan tetap di halaman input.
+        // Kembali kosong setelah save.
 
         amount.text.clear()
         otherNote.text.clear()
@@ -317,13 +440,8 @@ class MainActivity : Activity() {
                 sum += expense.getLong("amount")
             }
 
-            val formatter =
-                NumberFormat.getNumberInstance(
-                    Locale("id", "ID")
-                )
-
             total.text =
-                "Rp ${formatter.format(sum)}"
+                "${currencyPrefix()} ${formatCurrency(sum)}"
 
             chart.text =
                 if (filtered.isEmpty()) {
@@ -366,20 +484,27 @@ class MainActivity : Activity() {
     // GET EXPENSES
     // =========================
 
-    private fun getExpenses(): List<JSONObject> {
+    private fun getExpenses():
+            List<JSONObject> {
 
-        val prefs = getSharedPreferences(
-            "expense",
-            MODE_PRIVATE
-        )
+        val prefs =
+            getSharedPreferences(
+                "expense",
+                MODE_PRIVATE
+            )
 
         val array = JSONArray(
-            prefs.getString("expenses", "[]")
+            prefs.getString(
+                "expenses",
+                "[]"
+            )
         )
 
-        val result = mutableListOf<JSONObject>()
+        val result =
+            mutableListOf<JSONObject>()
 
         for (i in 0 until array.length()) {
+
             result.add(
                 array.getJSONObject(i)
             )
@@ -389,7 +514,7 @@ class MainActivity : Activity() {
     }
 
     // =========================
-    // PERIOD FILTER
+    // PERIOD
     // =========================
 
     private fun matchesPeriod(
@@ -405,36 +530,25 @@ class MainActivity : Activity() {
 
         return when (period) {
 
-            // Daily
             0 ->
-
                 date.get(Calendar.YEAR) ==
                     now.get(Calendar.YEAR) &&
-
                 date.get(Calendar.DAY_OF_YEAR) ==
                     now.get(Calendar.DAY_OF_YEAR)
 
-            // Weekly
             1 ->
-
                 date.get(Calendar.YEAR) ==
                     now.get(Calendar.YEAR) &&
-
                 date.get(Calendar.WEEK_OF_YEAR) ==
                     now.get(Calendar.WEEK_OF_YEAR)
 
-            // Monthly
             2 ->
-
                 date.get(Calendar.YEAR) ==
                     now.get(Calendar.YEAR) &&
-
                 date.get(Calendar.MONTH) ==
                     now.get(Calendar.MONTH)
 
-            // Yearly
             3 ->
-
                 date.get(Calendar.YEAR) ==
                     now.get(Calendar.YEAR)
 
@@ -443,7 +557,7 @@ class MainActivity : Activity() {
     }
 
     // =========================
-    // SIMPLE CHART
+    // CHART
     // =========================
 
     private fun buildSimpleChart(
@@ -465,11 +579,6 @@ class MainActivity : Activity() {
                 (categories[name] ?: 0L) + value
         }
 
-        val formatter =
-            NumberFormat.getNumberInstance(
-                Locale("id", "ID")
-            )
-
         val result =
             StringBuilder()
 
@@ -480,8 +589,9 @@ class MainActivity : Activity() {
                 .append("\n")
 
             result
-                .append("Rp ")
-                .append(formatter.format(value))
+                .append(currencyPrefix())
+                .append(" ")
+                .append(formatCurrency(value))
                 .append("\n\n")
         }
 
@@ -520,11 +630,6 @@ class MainActivity : Activity() {
                 (categories[name] ?: 0L) + value
         }
 
-        val formatter =
-            NumberFormat.getNumberInstance(
-                Locale("id", "ID")
-            )
-
         val message =
 
             if (categories.isEmpty()) {
@@ -537,8 +642,8 @@ class MainActivity : Activity() {
                     "\n\n"
                 ) {
 
-                    "${it.key}\nRp ${
-                        formatter.format(it.value)
+                    "${it.key}\n${currencyPrefix()} ${
+                        formatCurrency(it.value)
                     }"
                 }
             }
@@ -546,7 +651,10 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle("Detailed Expense")
             .setMessage(message)
-            .setPositiveButton("OK", null)
+            .setPositiveButton(
+                "OK",
+                null
+            )
             .show()
     }
 
@@ -563,12 +671,16 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle("Reminder")
             .setView(input)
-            .setPositiveButton("SET REMINDER") { _, _ ->
+            .setPositiveButton(
+                "SET REMINDER"
+            ) { _, _ ->
 
-                // Reminder notification
-                // akan dibuat di tahap berikutnya.
+                // Akan dibuat nanti.
             }
-            .setNegativeButton("CANCEL", null)
+            .setNegativeButton(
+                "CANCEL",
+                null
+            )
             .show()
     }
 
@@ -579,7 +691,7 @@ class MainActivity : Activity() {
     private fun showSettings() {
 
         val items = arrayOf(
-            "Currency: IDR",
+            "Currency: ${getCurrency()}",
             "Language: Indonesia",
             "Conversion Rate",
             "Disclaimer"
@@ -587,8 +699,79 @@ class MainActivity : Activity() {
 
         AlertDialog.Builder(this)
             .setTitle("Setting")
-            .setItems(items, null)
-            .setNegativeButton("OK", null)
+            .setItems(items) { _, which ->
+
+                when (which) {
+
+                    0 -> chooseCurrency()
+
+                    1 -> {
+                        // First launch Indonesia.
+                    }
+
+                    2 -> {
+                        // Conversion rate nanti.
+                    }
+
+                    3 -> showDisclaimer()
+                }
+            }
+            .setNegativeButton(
+                "OK",
+                null
+            )
+            .show()
+    }
+
+    private fun chooseCurrency() {
+
+        val currencies = arrayOf(
+            "IDR",
+            "USD"
+        )
+
+        val current =
+            if (getCurrency() == "USD") 1 else 0
+
+        AlertDialog.Builder(this)
+            .setTitle("Currency")
+            .setSingleChoiceItems(
+                currencies,
+                current
+            ) { dialog, which ->
+
+                val currency =
+                    currencies[which]
+
+                getSharedPreferences(
+                    "expense",
+                    MODE_PRIVATE
+                )
+                    .edit()
+                    .putString(
+                        "currency",
+                        currency
+                    )
+                    .apply()
+
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun showDisclaimer() {
+
+        AlertDialog.Builder(this)
+            .setTitle("Disclaimer")
+            .setMessage(
+                "Expense is a simple personal " +
+                "expense tracker. Use the data " +
+                "at your own discretion."
+            )
+            .setPositiveButton(
+                "OK",
+                null
+            )
             .show()
     }
 
@@ -609,7 +792,10 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle("About")
             .setMessage(message)
-            .setPositiveButton("OK", null)
+            .setPositiveButton(
+                "OK",
+                null
+            )
             .show()
     }
 
@@ -618,10 +804,6 @@ class MainActivity : Activity() {
     // =========================
 
     override fun onBackPressed() {
-
-        // Dari halaman mana pun:
-        // Back -> Expense.
-        // Back lagi -> Exit.
 
         showExpense()
     }
