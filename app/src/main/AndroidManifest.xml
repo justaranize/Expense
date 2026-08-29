@@ -12,6 +12,7 @@
     <application
         android:theme="@style/AppTheme"
         android:label="Expense"
+        android:icon="@drawable/app_icon"
         android:allowBackup="true"
         android:supportsRtl="true">
 
