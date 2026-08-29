@@ -108,10 +108,11 @@ class MainActivity : Activity() {
             }
 
         amount = EditText(this).apply {
-            hint = "Rp 0"
+            hint = "${currencyPrefix()} 0"
             inputType = InputType.TYPE_CLASS_NUMBER
             gravity = Gravity.CENTER
             textSize = 28f
+            setSingleLine(true)
         }
 
         amount.addTextChangedListener(
@@ -137,25 +138,32 @@ class MainActivity : Activity() {
 
                     if (formattingAmount) return
 
-                    val raw = s
-                        ?.toString()
-                        ?.replace(".", "")
-                        ?.replace(",", "")
-                        ?.replace("Rp", "")
-                        ?.replace("$", "")
-                        ?.trim()
+                    val text =
+                        s?.toString() ?: ""
 
-                    if (raw.isNullOrEmpty()) return
+                    val raw = text
+                        .replace(".", "")
+                        .replace(",", "")
+                        .replace("Rp", "")
+                        .replace("$", "")
+                        .replace(" ", "")
+                        .trim()
 
-                    val number = raw.toLongOrNull()
-                        ?: return
+                    if (raw.isEmpty()) {
+                        return
+                    }
+
+                    val number =
+                        raw.toLongOrNull()
+                            ?: return
 
                     formattingAmount = true
 
                     val formatted =
-                        formatCurrency(number)
+                        formatInputCurrency(number)
 
                     amount.setText(formatted)
+
                     amount.setSelection(
                         amount.text.length
                     )
@@ -177,51 +185,27 @@ class MainActivity : Activity() {
         root.addView(category)
         root.addView(otherNote)
         root.addView(amount)
-
-        root.addView(
-            save,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        )
+        root.addView(save)
 
         setContentView(root)
     }
 
     // =========================
-    // CURRENCY FORMAT
+    // CURRENCY
     // =========================
 
     private fun getCurrency(): String {
 
-        val prefs = getSharedPreferences(
-            "expense",
-            MODE_PRIVATE
-        )
+        val prefs =
+            getSharedPreferences(
+                "expense",
+                MODE_PRIVATE
+            )
 
         return prefs.getString(
             "currency",
             "IDR"
         ) ?: "IDR"
-    }
-
-    private fun formatCurrency(
-        value: Long
-    ): String {
-
-        return if (getCurrency() == "USD") {
-
-            NumberFormat.getNumberInstance(
-                Locale.US
-            ).format(value)
-
-        } else {
-
-            NumberFormat.getNumberInstance(
-                Locale("id", "ID")
-            ).format(value)
-        }
     }
 
     private fun currencyPrefix(): String {
@@ -230,6 +214,49 @@ class MainActivity : Activity() {
             "$"
         } else {
             "Rp"
+        }
+    }
+
+    private fun formatInputCurrency(
+        value: Long
+    ): String {
+
+        val formatted =
+            if (getCurrency() == "USD") {
+
+                NumberFormat
+                    .getNumberInstance(Locale.US)
+                    .format(value)
+
+            } else {
+
+                NumberFormat
+                    .getNumberInstance(
+                        Locale("id", "ID")
+                    )
+                    .format(value)
+            }
+
+        return "${currencyPrefix()} $formatted"
+    }
+
+    private fun formatCurrency(
+        value: Long
+    ): String {
+
+        return if (getCurrency() == "USD") {
+
+            NumberFormat
+                .getNumberInstance(Locale.US)
+                .format(value)
+
+        } else {
+
+            NumberFormat
+                .getNumberInstance(
+                    Locale("id", "ID")
+                )
+                .format(value)
         }
     }
 
@@ -245,12 +272,15 @@ class MainActivity : Activity() {
             .replace(",", "")
             .replace("Rp", "")
             .replace("$", "")
+            .replace(" ", "")
             .trim()
 
-        val value = raw.toLongOrNull()
+        val value =
+            raw.toLongOrNull()
 
         if (value == null || value <= 0) {
-            amount.error = "Masukkan nominal"
+            amount.error =
+                "Masukkan nominal"
             return
         }
 
@@ -269,35 +299,37 @@ class MainActivity : Activity() {
             return
         }
 
-        val expense = JSONObject().apply {
+        val expense =
+            JSONObject().apply {
 
-            put(
-                "category",
-                category.selectedItem.toString()
-            )
+                put(
+                    "category",
+                    category.selectedItem
+                        .toString()
+                )
 
-            put(
-                "amount",
-                value
-            )
+                put(
+                    "amount",
+                    value
+                )
 
-            put(
-                "currency",
-                getCurrency()
-            )
+                put(
+                    "currency",
+                    getCurrency()
+                )
 
-            put(
-                "note",
-                otherNote.text
-                    .toString()
-                    .trim()
-            )
+                put(
+                    "note",
+                    otherNote.text
+                        .toString()
+                        .trim()
+                )
 
-            put(
-                "timestamp",
-                System.currentTimeMillis()
-            )
-        }
+                put(
+                    "timestamp",
+                    System.currentTimeMillis()
+                )
+            }
 
         val prefs =
             getSharedPreferences(
@@ -305,12 +337,13 @@ class MainActivity : Activity() {
                 MODE_PRIVATE
             )
 
-        val expenses = JSONArray(
-            prefs.getString(
-                "expenses",
-                "[]"
+        val expenses =
+            JSONArray(
+                prefs.getString(
+                    "expenses",
+                    "[]"
+                )
             )
-        )
 
         expenses.put(expense)
 
@@ -320,8 +353,6 @@ class MainActivity : Activity() {
                 expenses.toString()
             )
             .apply()
-
-        // Kembali kosong setelah save.
 
         amount.text.clear()
         otherNote.text.clear()
@@ -367,103 +398,165 @@ class MainActivity : Activity() {
 
     private fun showHistory() {
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 32, 24, 24)
-            setBackgroundColor(Color.WHITE)
-        }
+        val root =
+            LinearLayout(this).apply {
 
-        val title = TextView(this).apply {
-            text = "History"
-            textSize = 30f
-            setTextColor(Color.BLACK)
-        }
+                orientation =
+                    LinearLayout.VERTICAL
 
-        val period = Spinner(this)
+                setPadding(
+                    24,
+                    32,
+                    24,
+                    24
+                )
 
-        period.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            arrayOf(
-                "Daily",
-                "Weekly",
-                "Monthly",
-                "Yearly"
-            )
-        )
-
-        val totalLabel = TextView(this).apply {
-            text = "Total Expense"
-            textSize = 16f
-            setTextColor(Color.BLACK)
-        }
-
-        val total = TextView(this).apply {
-            textSize = 28f
-            gravity = Gravity.CENTER
-            setTextColor(Color.BLACK)
-            setPadding(0, 16, 0, 16)
-        }
-
-        val chart = TextView(this).apply {
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setTextColor(Color.BLACK)
-            setPadding(0, 24, 0, 24)
-        }
-
-        val detailed = Button(this).apply {
-            text = "DETAILED EXPENSE"
-
-            setOnClickListener {
-                showDetailedExpense(
-                    period.selectedItemPosition
+                setBackgroundColor(
+                    Color.WHITE
                 )
             }
-        }
+
+        val title =
+            TextView(this).apply {
+
+                text = "History"
+                textSize = 30f
+                setTextColor(Color.BLACK)
+            }
+
+        val period =
+            Spinner(this)
+
+        period.adapter =
+            ArrayAdapter(
+                this,
+                android.R.layout
+                    .simple_spinner_dropdown_item,
+                arrayOf(
+                    "Daily",
+                    "Weekly",
+                    "Monthly",
+                    "Yearly"
+                )
+            )
+
+        val totalLabel =
+            TextView(this).apply {
+
+                text = "Total Expense"
+                textSize = 16f
+                setTextColor(Color.BLACK)
+            }
+
+        val total =
+            TextView(this).apply {
+
+                textSize = 28f
+                gravity = Gravity.CENTER
+                setTextColor(Color.BLACK)
+
+                setPadding(
+                    0,
+                    16,
+                    0,
+                    16
+                )
+            }
+
+        val chart =
+            TextView(this).apply {
+
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setTextColor(Color.BLACK)
+
+                setPadding(
+                    0,
+                    24,
+                    0,
+                    24
+                )
+            }
+
+        val detailed =
+            Button(this).apply {
+
+                text =
+                    "DETAILED EXPENSE"
+
+                setOnClickListener {
+
+                    showDetailedExpense(
+                        period
+                            .selectedItemPosition
+                    )
+                }
+            }
 
         fun refresh() {
 
-            val expenses = getExpenses()
+            val expenses =
+                getExpenses()
 
-            val filtered = expenses.filter {
+            val filtered =
+                expenses.filter {
 
-                matchesPeriod(
-                    it.getLong("timestamp"),
-                    period.selectedItemPosition
-                )
-            }
+                    matchesPeriod(
+                        it.getLong(
+                            "timestamp"
+                        ),
+                        period
+                            .selectedItemPosition
+                    )
+                }
 
             var sum = 0L
 
             for (expense in filtered) {
-                sum += expense.getLong("amount")
+
+                sum +=
+                    expense.getLong(
+                        "amount"
+                    )
             }
 
             total.text =
-                "${currencyPrefix()} ${formatCurrency(sum)}"
+                "${currencyPrefix()} ${
+                    formatCurrency(sum)
+                }"
 
             chart.text =
                 if (filtered.isEmpty()) {
+
                     "Chart kosong"
+
                 } else {
-                    buildSimpleChart(filtered)
+
+                    buildSimpleChart(
+                        filtered
+                    )
                 }
         }
 
         period.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
+            object :
+                AdapterView
+                    .OnItemSelectedListener {
 
-                override fun onNothingSelected(
-                    parent: AdapterView<*>?
-                ) {}
+                override fun
+                    onNothingSelected(
+                        parent:
+                        AdapterView<*>?
+                    ) {}
 
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
+                override fun
+                    onItemSelected(
+                        parent:
+                        AdapterView<*>?,
+                        view: View?,
+                        position: Int,
+                        id: Long
+                    ) {
                     refresh()
                 }
             }
@@ -485,7 +578,7 @@ class MainActivity : Activity() {
     // =========================
 
     private fun getExpenses():
-            List<JSONObject> {
+        List<JSONObject> {
 
         val prefs =
             getSharedPreferences(
@@ -493,17 +586,19 @@ class MainActivity : Activity() {
                 MODE_PRIVATE
             )
 
-        val array = JSONArray(
-            prefs.getString(
-                "expenses",
-                "[]"
+        val array =
+            JSONArray(
+                prefs.getString(
+                    "expenses",
+                    "[]"
+                )
             )
-        )
 
         val result =
             mutableListOf<JSONObject>()
 
-        for (i in 0 until array.length()) {
+        for (i in
+            0 until array.length()) {
 
             result.add(
                 array.getJSONObject(i)
@@ -522,37 +617,77 @@ class MainActivity : Activity() {
         period: Int
     ): Boolean {
 
-        val now = Calendar.getInstance()
+        val now =
+            Calendar.getInstance()
 
-        val date = Calendar.getInstance().apply {
-            timeInMillis = timestamp
-        }
+        val date =
+            Calendar.getInstance().apply {
+
+                timeInMillis =
+                    timestamp
+            }
 
         return when (period) {
 
             0 ->
-                date.get(Calendar.YEAR) ==
-                    now.get(Calendar.YEAR) &&
-                date.get(Calendar.DAY_OF_YEAR) ==
-                    now.get(Calendar.DAY_OF_YEAR)
+
+                date.get(
+                    Calendar.YEAR
+                ) ==
+                    now.get(
+                        Calendar.YEAR
+                    ) &&
+
+                date.get(
+                    Calendar.DAY_OF_YEAR
+                ) ==
+                    now.get(
+                        Calendar.DAY_OF_YEAR
+                    )
 
             1 ->
-                date.get(Calendar.YEAR) ==
-                    now.get(Calendar.YEAR) &&
-                date.get(Calendar.WEEK_OF_YEAR) ==
-                    now.get(Calendar.WEEK_OF_YEAR)
+
+                date.get(
+                    Calendar.YEAR
+                ) ==
+                    now.get(
+                        Calendar.YEAR
+                    ) &&
+
+                date.get(
+                    Calendar.WEEK_OF_YEAR
+                ) ==
+                    now.get(
+                        Calendar.WEEK_OF_YEAR
+                    )
 
             2 ->
-                date.get(Calendar.YEAR) ==
-                    now.get(Calendar.YEAR) &&
-                date.get(Calendar.MONTH) ==
-                    now.get(Calendar.MONTH)
+
+                date.get(
+                    Calendar.YEAR
+                ) ==
+                    now.get(
+                        Calendar.YEAR
+                    ) &&
+
+                date.get(
+                    Calendar.MONTH
+                ) ==
+                    now.get(
+                        Calendar.MONTH
+                    )
 
             3 ->
-                date.get(Calendar.YEAR) ==
-                    now.get(Calendar.YEAR)
 
-            else -> false
+                date.get(
+                    Calendar.YEAR
+                ) ==
+                    now.get(
+                        Calendar.YEAR
+                    )
+
+            else ->
+                false
         }
     }
 
@@ -561,7 +696,8 @@ class MainActivity : Activity() {
     // =========================
 
     private fun buildSimpleChart(
-        expenses: List<JSONObject>
+        expenses:
+        List<JSONObject>
     ): String {
 
         val categories =
@@ -570,19 +706,27 @@ class MainActivity : Activity() {
         for (expense in expenses) {
 
             val name =
-                expense.getString("category")
+                expense.getString(
+                    "category"
+                )
 
             val value =
-                expense.getLong("amount")
+                expense.getLong(
+                    "amount"
+                )
 
             categories[name] =
-                (categories[name] ?: 0L) + value
+                (categories[name] ?: 0L) +
+                    value
         }
 
         val result =
             StringBuilder()
 
-        for ((name, value) in categories) {
+        for (
+            (name, value)
+            in categories
+        ) {
 
             result
                 .append(name)
@@ -591,11 +735,15 @@ class MainActivity : Activity() {
             result
                 .append(currencyPrefix())
                 .append(" ")
-                .append(formatCurrency(value))
+                .append(
+                    formatCurrency(value)
+                )
                 .append("\n\n")
         }
 
-        return result.toString().trim()
+        return result
+            .toString()
+            .trim()
     }
 
     // =========================
@@ -610,7 +758,9 @@ class MainActivity : Activity() {
             getExpenses().filter {
 
                 matchesPeriod(
-                    it.getLong("timestamp"),
+                    it.getLong(
+                        "timestamp"
+                    ),
                     period
                 )
             }
@@ -621,13 +771,18 @@ class MainActivity : Activity() {
         for (expense in expenses) {
 
             val name =
-                expense.getString("category")
+                expense.getString(
+                    "category"
+                )
 
             val value =
-                expense.getLong("amount")
+                expense.getLong(
+                    "amount"
+                )
 
             categories[name] =
-                (categories[name] ?: 0L) + value
+                (categories[name] ?: 0L) +
+                    value
         }
 
         val message =
@@ -638,18 +793,23 @@ class MainActivity : Activity() {
 
             } else {
 
-                categories.entries.joinToString(
-                    "\n\n"
-                ) {
+                categories.entries
+                    .joinToString("\n\n") {
 
-                    "${it.key}\n${currencyPrefix()} ${
-                        formatCurrency(it.value)
-                    }"
-                }
+                        "${it.key}\n${
+                            currencyPrefix()
+                        } ${
+                            formatCurrency(
+                                it.value
+                            )
+                        }"
+                    }
             }
 
         AlertDialog.Builder(this)
-            .setTitle("Detailed Expense")
+            .setTitle(
+                "Detailed Expense"
+            )
             .setMessage(message)
             .setPositiveButton(
                 "OK",
@@ -664,9 +824,12 @@ class MainActivity : Activity() {
 
     private fun showReminder() {
 
-        val input = EditText(this).apply {
-            hint = "Tulis reminder"
-        }
+        val input =
+            EditText(this).apply {
+
+                hint =
+                    "Tulis reminder"
+            }
 
         AlertDialog.Builder(this)
             .setTitle("Reminder")
@@ -675,7 +838,8 @@ class MainActivity : Activity() {
                 "SET REMINDER"
             ) { _, _ ->
 
-                // Akan dibuat nanti.
+                // Akan dibuat
+                // di tahap berikutnya.
             }
             .setNegativeButton(
                 "CANCEL",
@@ -691,9 +855,15 @@ class MainActivity : Activity() {
     private fun showSettings() {
 
         val items = arrayOf(
-            "Currency: ${getCurrency()}",
+
+            "Currency: ${
+                getCurrency()
+            }",
+
             "Language: Indonesia",
+
             "Conversion Rate",
+
             "Disclaimer"
         )
 
@@ -703,17 +873,21 @@ class MainActivity : Activity() {
 
                 when (which) {
 
-                    0 -> chooseCurrency()
+                    0 ->
+                        chooseCurrency()
 
                     1 -> {
-                        // First launch Indonesia.
+                        // Indonesia
+                        // untuk first launch.
                     }
 
                     2 -> {
-                        // Conversion rate nanti.
+                        // Conversion rate
+                        // akan dibuat nanti.
                     }
 
-                    3 -> showDisclaimer()
+                    3 ->
+                        showDisclaimer()
                 }
             }
             .setNegativeButton(
@@ -725,13 +899,20 @@ class MainActivity : Activity() {
 
     private fun chooseCurrency() {
 
-        val currencies = arrayOf(
-            "IDR",
-            "USD"
-        )
+        val currencies =
+            arrayOf(
+                "IDR",
+                "USD"
+            )
 
         val current =
-            if (getCurrency() == "USD") 1 else 0
+            if (
+                getCurrency() == "USD"
+            ) {
+                1
+            } else {
+                0
+            }
 
         AlertDialog.Builder(this)
             .setTitle("Currency")
@@ -740,9 +921,6 @@ class MainActivity : Activity() {
                 current
             ) { dialog, which ->
 
-                val currency =
-                    currencies[which]
-
                 getSharedPreferences(
                     "expense",
                     MODE_PRIVATE
@@ -750,11 +928,15 @@ class MainActivity : Activity() {
                     .edit()
                     .putString(
                         "currency",
-                        currency
+                        currencies[which]
                     )
                     .apply()
 
                 dialog.dismiss()
+
+                // Refresh halaman input
+                // agar prefix langsung berubah.
+                showExpense()
             }
             .show()
     }
