@@ -129,15 +129,17 @@ class MainActivity : Activity() {
             }
 
         amount = EditText(this).apply {
-            hint = "Rp 0"
-            inputType = InputType.TYPE_CLASS_NUMBER
-            gravity = Gravity.CENTER
-            textSize = 28f
-            setSingleLine(true)
+    inputType = InputType.TYPE_CLASS_NUMBER
+    gravity = Gravity.CENTER
+    textSize = 28f
+    setSingleLine(true)
 
-            // Tidak ada garis bawaan EditText
-            background = null
-        }
+    setTextColor(Color.BLACK)
+    background = null
+
+    setText("Rp 0")
+    setSelection(text.length)
+}
 
         amount.addTextChangedListener(
             object : TextWatcher {
